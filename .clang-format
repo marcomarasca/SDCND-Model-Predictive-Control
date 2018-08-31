@@ -1,0 +1,6 @@
+﻿---
+BasedOnStyle: Google
+Language: Cpp
+ColumnLimit: 120
+
+...

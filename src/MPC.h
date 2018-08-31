@@ -2,9 +2,9 @@
 #define MPC_H
 
 #include <vector>
-#include "Eigen-3.3/Eigen/Core"
+#include "Eigen/Core"
 
-using namespace std;
+namespace MPC {
 
 class MPC {
  public:
@@ -12,9 +12,14 @@ class MPC {
 
   virtual ~MPC();
 
-  // Solve the model given an initial state and polynomial coefficients.
-  // Return the first actuatotions.
-  vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
+  /*
+   * Solve the model given an initial state and polynomial coefficients.
+   *
+   * @return The first actuatotions.
+   */
+  std::vector<double> Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coeffs);
 };
+
+}  // namespace MPC
 
 #endif /* MPC_H */
