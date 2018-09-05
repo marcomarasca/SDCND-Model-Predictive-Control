@@ -10,7 +10,7 @@ namespace MPC {
 typedef CPPAD_TESTVECTOR(double) Dvector;
 
 // Number of state variables
-#define STATE_SIZE 6
+const size_t STATE_SIZE = 6;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -22,26 +22,27 @@ typedef CPPAD_TESTVECTOR(double) Dvector;
 // presented in the classroom matched the previous radius.
 //
 // This is the length from front to CoG that has a similar radius.
-#define LF 2.67
+const double LF = 2.67;
 
 // Weights for the components of the cost function
-#define W_CTE 1000
-#define W_EPSI 1
-#define W_V 1
-#define W_DELTA 1
-#define W_A 1
-#define W_DELTA_D 1
-#define W_A_D 1
+const double W_CTE = 1;
+const double W_EPSI = 1;
+const double W_V = 1;
+const double W_DELTA = 1;
+const double W_A = 1;
+const double W_DELTA_D = 1;
+const double W_A_D = 1;
 
 // Limit bounds
-#define L_MAX 1.0e19
-#define L_THOTTLE 1
-#define L_STEERING 0.436332
+const double L_MAX = 1.0e19;
+const double L_THOTTLE = 1;
+const double L_STEERING = 0.436332;
 
+// Container for the MPC configuration
 struct CONFIG {
   size_t steps_n;
-  size_t step_dt;
-  double target_v;
+  double step_dt;
+  double target_speed;
   // The solver takes all the state variables and actuator variables in a singular vector. Thus, we should to establish
   // when one variable starts and another ends to make our lifes easier.
   size_t x_start;
@@ -54,8 +55,20 @@ struct CONFIG {
   size_t a_start;
 };
 
+// Container for the MPC solution
+struct MPC_SOLUTION {
+  double cost;
+  // The values computed from the MPC
+  double delta_next;
+  double a_next;
+  std::vector<double> x_predicted;
+  std::vector<double> y_predicted;
+};
+
 class MPC {
  public:
+  // MPC configuration
+  CONFIG config;
   /*
    * Default constructor, uses 10 steps and 0.1 as delta time
    */
@@ -65,23 +78,23 @@ class MPC {
    * Contrsuctor
    *
    * @param steps_n Number of total steps to solve for
-   * @params step_dt Delta time between each step
+   * @params step_dt Delta time between each step (in seconds)
+   * @params target_speed Target speed
    */
-  MPC(size_t steps_n, size_t step_dt, double target_v);
+  MPC(size_t steps_n, double step_dt, double target_speed);
 
   virtual ~MPC();
 
   /*
    * Solve the model given an initial state and polynomial coefficients.
    *
-   * @return The first actuations.
+   * @return The (first) actuator values (delta and a) as well as the points for the predicted trajectory (x_predicted
+   * and y_predicted).
    */
-  std::vector<double> Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coeffs);
+  MPC_SOLUTION Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coeffs);
 
  private:
   const char* ipopt_options;
-
-  CONFIG config;
 
   // Variables for the solver
   Dvector vars;
@@ -94,8 +107,17 @@ class MPC {
   Dvector constraints_lowerbound;
   Dvector constraints_upperbound;
 
-  void InitVariables(const Eigen::VectorXd& state);
-  void InitLimits(const Eigen::VectorXd& state);
+  /*
+   * Variables and constraints initialization
+   */
+  void InitVariables();
+
+  /*
+   * Updates the variables and constraints limits according to the given state vector
+   *
+   * @param state State vector
+   */
+  void UpdateVariables(const Eigen::VectorXd& state);
 };
 
 }  // namespace MPC
