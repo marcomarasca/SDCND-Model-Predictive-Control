@@ -116,12 +116,10 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   file_out << v << "\t";
   file_out << delta << "\t";
   file_out << a << "\t";
-  file_out << delta << "\t";
   file_out << cte << "\t";
   file_out << epsi << "\t";
   file_out << steer_value << "\t";
-  file_out << throttle_value << "\t";
-  file_out << std::endl;
+  file_out << throttle_value << std::endl;
   file_out.flush();
 
   // Display the MPC predicted trajectory (green)

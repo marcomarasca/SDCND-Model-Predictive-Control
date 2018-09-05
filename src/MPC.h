@@ -25,16 +25,16 @@ const size_t STATE_SIZE = 6;
 const double LF = 2.67;
 
 // Weights for the components of the cost function
-const double W_CTE = 1;
-const double W_EPSI = 1;
+const double W_CTE = 2000;
+const double W_EPSI = 2000;
 const double W_V = 1;
-const double W_DELTA = 1;
-const double W_A = 1;
-const double W_DELTA_D = 1;
-const double W_A_D = 1;
+const double W_DELTA = 50;
+const double W_A = 50;
+const double W_DELTA_D = 200;
+const double W_A_D = 10;
 
 // Limit bounds
-const double L_MAX = 1.0e19;
+const double L_MAX = 1.0e5;
 const double L_THOTTLE = 1;
 const double L_STEERING = 0.436332;
 
