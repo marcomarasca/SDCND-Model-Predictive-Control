@@ -22,12 +22,13 @@ const size_t STATE_SIZE = 6;
 // presented in the classroom matched the previous radius.
 //
 // This is the length from front to CoG that has a similar radius.
-const double LF = 2.67;
+const double LF           = 2.67;
+const double MAX_STEERING = 0.436332;  // 25 degrees in radians
 
 // Limit bounds
-const double L_MAX = 1.0e19;
-const double L_THOTTLE = 1;
-const double L_STEERING = 0.436332;  // 25 degrees in radians
+const double L_MAX      = 1.0e19;
+const double L_THOTTLE  = 1;
+const double L_STEERING = MAX_STEERING;
 
 // Container for the MPC configuration
 struct CONFIG {
@@ -59,14 +60,14 @@ struct VAR_IDX {
   size_t a_start;
 
   VAR_IDX(size_t steps_n) {
-    x_start = 0;
-    y_start = x_start + steps_n;
-    psi_start = y_start + steps_n;
-    v_start = psi_start + steps_n;
-    cte_start = v_start + steps_n;
-    epsi_start = cte_start + steps_n;
+    x_start     = 0;
+    y_start     = x_start + steps_n;
+    psi_start   = y_start + steps_n;
+    v_start     = psi_start + steps_n;
+    cte_start   = v_start + steps_n;
+    epsi_start  = cte_start + steps_n;
     delta_start = epsi_start + steps_n;
-    a_start = delta_start + steps_n - 1;
+    a_start     = delta_start + steps_n - 1;
   }
 
   ~VAR_IDX() {}
@@ -110,7 +111,6 @@ class MPC {
   MPC_SOLUTION Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coeffs);
 
  private:
-  MPC();
   // Variable indexes for ipopt
   VAR_IDX var_idx;
   // Ipopt options
@@ -126,6 +126,11 @@ class MPC {
   // lower and upper limits for contraints
   Dvector constraints_lowerbound;
   Dvector constraints_upperbound;
+
+  /*
+   * Private constructor
+   */
+  MPC();
 
   /*
    * Variables and constraints initialization
