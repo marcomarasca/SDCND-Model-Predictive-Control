@@ -10,7 +10,8 @@ class FG_eval {
   typedef CppAD::AD<double> ADdouble;
   typedef CPPAD_TESTVECTOR(ADdouble) ADvector;
 
-  FG_eval(const CONFIG& config, const Eigen::VectorXd& coeffs) : config(config), coeffs(coeffs) {}
+  FG_eval(const CONFIG& config, VAR_IDX& var_idx, const Eigen::VectorXd& coeffs)
+      : config(config), var_idx(var_idx), coeffs(coeffs) {}
 
   /**
    * @param fg is a vector containing the cost and constraints.
@@ -25,33 +26,40 @@ class FG_eval {
  private:
   // MPC configuration parameters
   CONFIG config;
+  // Variable indexes
+  VAR_IDX var_idx;
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
 
-  void InitCost(CppAD::AD<double>& cost, const ADvector& vars) {
+  void InitCost(ADdouble& cost, const ADvector& vars) {
+    cost = 0.0;
     // The part of the cost based on the reference state.
     for (size_t t = 0; t < config.steps_n; ++t) {
-      const ADdouble cte = vars[config.cte_start + t];
-      const ADdouble epsi = vars[config.epsi_start + t];
-      const ADdouble delta_v = vars[config.v_start + t] - config.target_speed;
+      const auto cte = vars[var_idx.cte_start + t];
+      const auto epsi = vars[var_idx.epsi_start + t];
+      const auto delta_v = vars[var_idx.v_start + t] - config.target_speed;
 
-      cost += W_CTE * cte * cte + W_EPSI * epsi * epsi + W_V * delta_v * delta_v;
+      cost += config.w_cte * CppAD::pow(cte, 2);
+      cost += config.w_epsi * CppAD::pow(epsi, 2);
+      cost += config.w_v * CppAD::pow(delta_v, 2);
     }
 
     // Minimize the use of actuators.
     for (size_t t = 0; t < config.steps_n - 1; ++t) {
-      const ADdouble delta = vars[config.delta_start + t];
-      const ADdouble a = vars[config.a_start + t];
+      const auto delta = vars[var_idx.delta_start + t];
+      const auto a = vars[var_idx.a_start + t];
 
-      cost += W_DELTA * delta * delta + W_A * a * a;
+      cost += config.w_delta * CppAD::pow(delta, 2);
+      cost += config.w_a * CppAD::pow(a, 2);
     }
 
     // Minimize the value gap between sequential actuations.
     for (size_t t = 0; t < config.steps_n - 2; ++t) {
-      const ADdouble delta_d = vars[config.delta_start + t + 1] - vars[config.delta_start + t];
-      const ADdouble a_d = vars[config.a_start + t + 1] - vars[config.a_start + t];
+      const auto delta_d = vars[var_idx.delta_start + t + 1] - vars[var_idx.delta_start + t];
+      const auto a_d = vars[var_idx.a_start + t + 1] - vars[var_idx.a_start + t];
 
-      cost += W_DELTA_D * delta_d * delta_d + W_A_D * a_d * a_d;
+      cost += config.w_delta_d * CppAD::pow(delta_d, 2);
+      cost += config.w_a_d * CppAD::pow(a_d, 2);
     }
   }
 
@@ -59,70 +67,66 @@ class FG_eval {
     // Initial constraints
     //
     // We add 1 to each of the starting indices due to cost being located at index 0 of `fg`.
-    fg[config.x_start + 1] = vars[config.x_start];
-    fg[config.y_start + 1] = vars[config.y_start];
-    fg[config.psi_start + 1] = vars[config.psi_start];
-    fg[config.v_start + 1] = vars[config.v_start];
-    fg[config.cte_start + 1] = vars[config.cte_start];
-    fg[config.epsi_start + 1] = vars[config.epsi_start];
+    fg[var_idx.x_start + 1] = vars[var_idx.x_start];
+    fg[var_idx.y_start + 1] = vars[var_idx.y_start];
+    fg[var_idx.psi_start + 1] = vars[var_idx.psi_start];
+    fg[var_idx.v_start + 1] = vars[var_idx.v_start];
+    fg[var_idx.cte_start + 1] = vars[var_idx.cte_start];
+    fg[var_idx.epsi_start + 1] = vars[var_idx.epsi_start];
 
     // The rest of the constraints
     for (size_t t = 0; t < config.steps_n - 1; ++t) {
       // The state at time t.
-      const ADdouble x0 = vars[config.x_start + t];
-      const ADdouble y0 = vars[config.y_start + t];
-      const ADdouble psi0 = vars[config.psi_start + t];
-      const ADdouble v0 = vars[config.v_start + t];
-      const ADdouble cte0 = vars[config.cte_start + t];
-      const ADdouble epsi0 = vars[config.epsi_start + t];
-      const ADdouble delta0 = vars[config.delta_start + t];
-      const ADdouble a0 = vars[config.a_start + t];
+      const auto x_0 = vars[var_idx.x_start + t];
+      const auto y_0 = vars[var_idx.y_start + t];
+      const auto psi_0 = vars[var_idx.psi_start + t];
+      const auto v_0 = vars[var_idx.v_start + t];
+      const auto epsi_0 = vars[var_idx.epsi_start + t];
+      const auto delta_0 = vars[var_idx.delta_start + t];
+      const auto a_0 = vars[var_idx.a_start + t];
 
       // The state at time t+1 .
-      const ADdouble x1 = vars[config.x_start + t + 1];
-      const ADdouble y1 = vars[config.y_start + t + 1];
-      const ADdouble psi1 = vars[config.psi_start + t + 1];
-      const ADdouble v1 = vars[config.v_start + t + 1];
-      const ADdouble cte1 = vars[config.cte_start + t + 1];
-      const ADdouble epsi1 = vars[config.epsi_start + t + 1];
+      const auto x_1 = vars[var_idx.x_start + t + 1];
+      const auto y_1 = vars[var_idx.y_start + t + 1];
+      const auto psi_1 = vars[var_idx.psi_start + t + 1];
+      const auto v_1 = vars[var_idx.v_start + t + 1];
+      const auto cte_1 = vars[var_idx.cte_start + t + 1];
+      const auto epsi_1 = vars[var_idx.epsi_start + t + 1];
+
+      const auto x_0_2 = CppAD::pow(x_0, 2);
+      const auto x_0_3 = x_0_2 * x_0;
 
       // y = ax^3 + bx^2 + cx + d
-      const ADdouble f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3);
+      const auto y_des_0 = coeffs[3] * x_0_3 + coeffs[2] * x_0_2 + coeffs[1] * x_0 + coeffs[0];
       // f'(y) = 3ax^2 + bx + c
-      const ADdouble psides0 = CppAD::atan(coeffs[1] + 2.0 * coeffs[2] * x0 + 3.0 * coeffs[3] * CppAD::pow(x0, 2));
+      const auto psi_des_0 = CppAD::atan(3.0 * coeffs[3] * x_0_2 + 2.0 * coeffs[2] * x_0 + coeffs[1]);
 
-      // fg[0] contains the cost, fg[1] is current state
-      fg[config.x_start + t + 2] = x1 - (x0 + v0 * CppAD::cos(psi0) * config.step_dt);
-      fg[config.y_start + t + 2] = y1 - (y0 + v0 * CppAD::sin(psi0) * config.step_dt);
-      fg[config.psi_start + t + 2] = psi1 - (psi0 - v0 / LF * delta0 * config.step_dt);
-      fg[config.v_start + t + 2] = v1 - (v0 + a0 * config.step_dt);
-      fg[config.cte_start + t + 2] = cte1 - (f0 - y0 + (v0 * CppAD::sin(epsi0) * config.step_dt));
-      fg[config.epsi_start + t + 2] = epsi1 - (psi0 - psides0 - v0 / LF * delta0 * config.step_dt);
+      // Model equations:
+      //
+      // x_[t+1]   = x[t] + v[t] * cos(psi[t]) * dt
+      // y_[t+1]   = y[t] + v[t] * sin(psi[t]) * dt
+      // psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+      // v_[t+1]   = v[t] + a[t] * dt
+      // cte[t+1]  = y[t] - f(x[t]) + v[t] * sin(epsi[t]) * dt
+      // epsi[t+1] = psi[t] - psi_des[t] + v[t] * delta[t] / Lf * dt
+      //
+      // Note: fg[0] contains the cost, fg[1] is current state hence the +2
+
+      fg[var_idx.x_start + t + 2] = x_1 - (x_0 + v_0 * CppAD::cos(psi_0) * config.step_dt);
+      fg[var_idx.y_start + t + 2] = y_1 - (y_0 + v_0 * CppAD::sin(psi_0) * config.step_dt);
+      fg[var_idx.psi_start + t + 2] = psi_1 - (psi_0 + v_0 / LF * delta_0 * config.step_dt);
+      fg[var_idx.v_start + t + 2] = v_1 - (v_0 + a_0 * config.step_dt);
+      fg[var_idx.cte_start + t + 2] = cte_1 - (y_0 - y_des_0 + (v_0 * CppAD::sin(epsi_0) * config.step_dt));
+      fg[var_idx.epsi_start + t + 2] = epsi_1 - (psi_0 - psi_des_0 + (v_0 / LF * delta_0 * config.step_dt));
     }
   }
 };
 
-//
-// MPC class definition implementation.
-//
-MPC::MPC() { MPC(10, 0.1, 50); }
-
-MPC::MPC(size_t steps_n, double step_dt, double target_speed) {
+MPC::MPC(CONFIG& config_in) : config(config_in), var_idx(config_in.steps_n) {
   // Set the number of model variables (includes both states and inputs).
-  size_t vars_n = steps_n * STATE_SIZE + 2 * (steps_n - 1);
+  size_t vars_n = config.steps_n * STATE_SIZE + 2 * (config.steps_n - 1);
   // Set the number of constraints
-  size_t constrains_n = steps_n * STATE_SIZE;
-
-  config = {steps_n, step_dt, target_speed};
-
-  config.x_start = 0;
-  config.y_start = config.x_start + steps_n;
-  config.psi_start = config.y_start + steps_n;
-  config.v_start = config.psi_start + steps_n;
-  config.cte_start = config.v_start + steps_n;
-  config.epsi_start = config.cte_start + steps_n;
-  config.delta_start = config.epsi_start + steps_n;
-  config.a_start = config.delta_start + steps_n - 1;
+  size_t constrains_n = config.steps_n * STATE_SIZE;
 
   vars = (vars_n);
   vars_lowerbound = (vars_n);
@@ -146,6 +150,7 @@ MPC::MPC(size_t steps_n, double step_dt, double target_speed) {
       "Sparse  true         reverse\n"
       "Numeric max_cpu_time 0.5\n";
 }
+
 MPC::~MPC() {}
 
 MPC_SOLUTION MPC::Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coeffs) {
@@ -153,7 +158,7 @@ MPC_SOLUTION MPC::Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coe
   UpdateVariables(state);
 
   // object that computes objective and constraints
-  FG_eval fg_eval(config, coeffs);
+  FG_eval fg_eval(config, var_idx, coeffs);
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;
@@ -162,24 +167,25 @@ MPC_SOLUTION MPC::Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coe
   CppAD::ipopt::solve<Dvector, FG_eval>(ipopt_options, vars, vars_lowerbound, vars_upperbound, constraints_lowerbound,
                                         constraints_upperbound, fg_eval, solution);
 
-  // TODO Check some of the solution values
-  // bool ok = true;
-  // ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
+  // Check solution status
+  if (solution.status != CppAD::ipopt::solve_result<Dvector>::success) {
+    std::cout << "[Warning] Could not find solution, status: " << solution.status << std::endl;
+  }
 
   // Cost
   auto cost = solution.obj_value;
 
   // Sets the actuator values
-  double delta_next = solution.x[config.delta_start];
-  double a_next = solution.x[config.a_start];
+  double delta_next = solution.x[var_idx.delta_start];
+  double a_next = solution.x[var_idx.a_start];
 
   std::vector<double> x_predicted(config.steps_n);
   std::vector<double> y_predicted(config.steps_n);
 
   // Sets the predicted trajectory points
   for (size_t i = 1; i < config.steps_n; ++i) {
-    x_predicted[i] = solution.x[config.x_start + i];
-    y_predicted[i] = solution.x[config.y_start + i];
+    x_predicted[i] = solution.x[var_idx.x_start + i];
+    y_predicted[i] = solution.x[var_idx.y_start + i];
   }
 
   return {cost, delta_next, a_next, x_predicted, y_predicted};
@@ -191,19 +197,19 @@ void MPC::InitVariables() {
     vars[i] = 0.0;
   }
   // Set all non-actuators upper and lowerlimits to the max negative and positive values.
-  for (size_t i = 0; i < config.delta_start; i++) {
+  for (size_t i = 0; i < var_idx.delta_start; i++) {
     vars_lowerbound[i] = -L_MAX;
     vars_upperbound[i] = L_MAX;
   }
 
   // The upper and lower limits for steering
-  for (size_t i = config.delta_start; i < config.a_start; ++i) {
+  for (size_t i = var_idx.delta_start; i < var_idx.a_start; ++i) {
     vars_lowerbound[i] = -L_STEERING;
     vars_upperbound[i] = L_STEERING;
   }
 
   // Acceleration/decceleration upper and lower limits.
-  for (size_t i = config.a_start; i < vars.size(); ++i) {
+  for (size_t i = var_idx.a_start; i < vars.size(); ++i) {
     vars_lowerbound[i] = -L_THOTTLE;
     vars_upperbound[i] = L_THOTTLE;
   }
@@ -216,25 +222,25 @@ void MPC::InitVariables() {
 
 void MPC::UpdateVariables(const Eigen::VectorXd& state) {
   // Set initial state
-  vars[config.x_start] = state[0];
-  vars[config.y_start] = state[1];
-  vars[config.psi_start] = state[2];
-  vars[config.v_start] = state[3];
-  vars[config.cte_start] = state[4];
-  vars[config.epsi_start] = state[5];
+  vars[var_idx.x_start] = state[0];
+  vars[var_idx.y_start] = state[1];
+  vars[var_idx.psi_start] = state[2];
+  vars[var_idx.v_start] = state[3];
+  vars[var_idx.cte_start] = state[4];
+  vars[var_idx.epsi_start] = state[5];
 
-  constraints_lowerbound[config.x_start] = state[0];
-  constraints_lowerbound[config.y_start] = state[1];
-  constraints_lowerbound[config.psi_start] = state[2];
-  constraints_lowerbound[config.v_start] = state[3];
-  constraints_lowerbound[config.cte_start] = state[4];
-  constraints_lowerbound[config.epsi_start] = state[5];
+  constraints_lowerbound[var_idx.x_start] = state[0];
+  constraints_lowerbound[var_idx.y_start] = state[1];
+  constraints_lowerbound[var_idx.psi_start] = state[2];
+  constraints_lowerbound[var_idx.v_start] = state[3];
+  constraints_lowerbound[var_idx.cte_start] = state[4];
+  constraints_lowerbound[var_idx.epsi_start] = state[5];
 
-  constraints_upperbound[config.x_start] = state[0];
-  constraints_upperbound[config.y_start] = state[1];
-  constraints_upperbound[config.psi_start] = state[2];
-  constraints_upperbound[config.v_start] = state[3];
-  constraints_upperbound[config.cte_start] = state[4];
-  constraints_upperbound[config.epsi_start] = state[5];
+  constraints_upperbound[var_idx.x_start] = state[0];
+  constraints_upperbound[var_idx.y_start] = state[1];
+  constraints_upperbound[var_idx.psi_start] = state[2];
+  constraints_upperbound[var_idx.v_start] = state[3];
+  constraints_upperbound[var_idx.cte_start] = state[4];
+  constraints_upperbound[var_idx.epsi_start] = state[5];
 }
 }  // namespace MPC

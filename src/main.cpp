@@ -9,11 +9,6 @@
 #include "json.hpp"
 #include "utils.h"
 
-#define DEFAULT_DELAY 100
-#define DEFAULT_STEPS 10
-#define DEFAULT_STEPS_DT 0.1
-#define DEFAULT_SPEED 100
-
 // for convenience
 using json = nlohmann::json;
 
@@ -37,7 +32,7 @@ void SendMessage(uWS::WebSocket<uWS::SERVER> &ws, std::string msg) {
 }
 
 void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer &timer, std::ofstream &file_out,
-                      json &telemetry, size_t delay) {
+                      json &telemetry) {
   // json_obj[1] is the data JSON object
   const std::vector<double> ptsx = telemetry["ptsx"];
   const std::vector<double> ptsy = telemetry["ptsy"];
@@ -45,7 +40,7 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   const double px = telemetry["x"];
   const double py = telemetry["y"];
   const double psi = telemetry["psi"];
-  const double v = telemetry["speed"];
+  const double v = MPC::Mph2ms(telemetry["speed"]);  // Converts the speed from mph to m/s
   const double delta = telemetry["steering_angle"];
   const double a = telemetry["throttle"];
 
@@ -68,46 +63,52 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   const auto coeffs = MPC::PolyFit(ptsx_car, ptsy_car, 3);
 
   // Computes the cross track error, which equals to the polynomial evaluated at 0
-  // due to the coordinates conversion (y is 0)
-  const double cte = coeffs[0];
+  // due to the coordinates conversion (x is 0 and y is 0):
+  // f(x) = ax^3 + bx^2 + cx + d
+  // cte = y - f(x)
+  const double cte = -coeffs[0];
 
   // Computes the orientation error, which can be found using the arctan of the derivative
-  // of the polynomial: y = ax^3 + bx^2 + cx + d, y' = 3ax^2 + 2bx + c
+  // of the polynomial:
+  // y = ax^3 + bx^2 + cx + d
+  // y' = 3ax^2 + 2bx + c
+  // epsi = psi - arctan(y')
   // Note, the evaluation is at x = 0 so only the 3rd coeffiecient c remains
   const double epsi = -atan(coeffs[1]);
-
-  // Delta transformed
-  const double delta_tr = -delta;
-
-  // Accounts for delay, predicting the state at step t + 1
-  const double dt = delay / 1000.0;
-  const double pred_px = v * dt;                                // x t+1 = x + v * cos(psi) * dt
-  const double pred_py = 0.0;                                   // y t+1 = y + v * sin(psi) * dt
-  const double pred_psi = v / MPC::LF * delta_tr * dt;          // psi t+1 = psi + v/LF * delta * dt
-  const double pred_v = v + a * dt;                             // v t+1 = v + a * dt
-  const double pred_cte = cte + v * sin(epsi) * dt;             // cte t+1 = f(x) - y + v * sin(epsi) * dt
-  const double pred_epsi = epsi + v / MPC::LF * delta_tr * dt;  // epsi t+1 = psi - psi_target + v/LF * delta * dt
 
   // Prepares the state vector
   Eigen::VectorXd state(MPC::STATE_SIZE);
 
-  state << pred_px, pred_py, pred_psi, pred_v, pred_cte, pred_epsi;
+  // After the conversion to the car's coordinates x, y and psi are zero (e.g. oriented with the car)
+  state << 0, 0, 0, v, cte, epsi;
+
+  // Computes delta_t as the actuators delay + the computation delay
+  const auto dt = MPC::Ms2s(mpc.config.delay + MPC::Timer::ToMilliseconds(timer.AverageDuration()).count());
+
+  // Accounts for delay (including the computation delay), predicting the state at step t + 1
+  MPC::UpdateState(state, -delta, a, MPC::LF, dt);
 
   MPC::Timer::TimePoint start = timer.Start();
+
   // Solve for new actuations (and to show predicted x and y in the future)
   MPC::MPC_SOLUTION solution = mpc.Solve(state, coeffs);
+
   MPC::Timer::Duration duration = timer.Eval(start);
 
-  // Next steering value, normalizing between [-1, 1] (taking into account center of gravity distance from the front)
-  const double steer_value = solution.delta_next / (MPC::Deg2rad(25) * MPC::LF);
+  // Next steering value, normalizing between [-1, 1]
+  const double steer_value = -solution.delta_next / MPC::L_STEERING;
+
   // Next throttle value
   const double throttle_value = solution.a_next;
 
-  std::cout << "Cost: " << std::setw(10) << solution.cost << " Steering: " << std::setw(12) << steer_value
-            << " Throttle:" << std::setw(10) << throttle_value << std::endl;
-  std::cout << "Time: " << std::setw(10) << MPC::Timer::ToMilliseconds(duration).count()
-            << " ms, Average: " << MPC::Timer::ToMilliseconds(timer.AverageDuration()).count()
-            << " ms, Total: " << MPC::Timer::ToMilliseconds(timer.TotalDuration()).count() << " ms" << std::endl;
+  std::cout << std::setw(5) << "Cost:" << std::setw(10) << solution.cost << std::setw(9) << "CTE:" << std::setw(10)
+            << cte << std::setw(10) << "Steering:" << std::setw(12) << steer_value << std::setw(10)
+            << "Throttle:" << std::setw(6) << throttle_value << std::endl;
+
+  std::cout << std::setw(5) << "Time:" << std::setw(7) << MPC::Timer::ToMilliseconds(duration).count() << " ms"
+            << std::setw(9) << "Average:" << std::setw(7) << MPC::Timer::ToMilliseconds(timer.AverageDuration()).count()
+            << " ms" << std::setw(10) << "Total:" << std::setw(9)
+            << MPC::Timer::ToMilliseconds(timer.TotalDuration()).count() << " ms" << std::endl;
 
   // Writes output to file
   file_out << px << "\t";
@@ -131,7 +132,7 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   std::vector<double> next_y_vals(mpc.config.steps_n * 2);
 
   // X distance between points
-  const double point_d = 4;
+  const double point_d = 2.5;
 
   for (size_t i = 1; i <= next_x_vals.size(); ++i) {
     next_x_vals[i - 1] = i * point_d;
@@ -157,15 +158,15 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   //
   // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
   // SUBMITTING.
-  if (delay > 0) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+  if (mpc.config.delay > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(mpc.config.delay));
   }
   SendMessage(ws, msg);
 }
 
-void RunServer(size_t delay, size_t steps, double steps_dt, double speed) {
-  std::cout << "Delay: " << delay << " ms, Steps: " << steps << ", Steps Delta: " << steps_dt
-            << " s, Target Speed: " << speed << std::endl;
+void RunServer(MPC::CONFIG &config) {
+  std::cout << "Delay: " << config.delay << " ms, Steps: " << config.steps_n << ", Steps Delta: " << config.step_dt
+            << " s, Target Speed: " << config.target_speed << " m/s" << std::endl;
 
   std::string file_name = "results.txt";
   // Creates a file to log values for plotting
@@ -177,29 +178,29 @@ void RunServer(size_t delay, size_t steps, double steps_dt, double speed) {
   }
 
   uWS::Hub h;
-  MPC::MPC mpc = {steps, steps_dt, speed};
+  // Initialize MPC converting units
+  MPC::MPC mpc = {config};
   MPC::Timer timer;
 
-  h.onMessage(
-      [&mpc, &timer, &file_out, &delay](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
-        // "42" at the start of the message means there's a websocket message event.
-        // The 4 signifies a websocket message
-        // The 2 signifies a websocket event
-        std::string sdata = std::string(data).substr(0, length);
-        if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
-          std::string message = HasData(sdata);
-          if (message != "") {
-            auto json_obj = json::parse(message);
-            std::string event = json_obj[0].get<std::string>();
-            if (event == "telemetry") {
-              ProcessTelemetry(ws, mpc, timer, file_out, json_obj[1], delay);
-            }
-          } else {
-            // Manual driving
-            SendMessage(ws, "42[\"manual\",{}]");
-          }
+  h.onMessage([&mpc, &timer, &file_out](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+    // "42" at the start of the message means there's a websocket message event.
+    // The 4 signifies a websocket message
+    // The 2 signifies a websocket event
+    std::string sdata = std::string(data).substr(0, length);
+    if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
+      std::string message = HasData(sdata);
+      if (message != "") {
+        auto json_obj = json::parse(message);
+        std::string event = json_obj[0].get<std::string>();
+        if (event == "telemetry") {
+          ProcessTelemetry(ws, mpc, timer, file_out, json_obj[1]);
         }
-      });
+      } else {
+        // Manual driving
+        SendMessage(ws, "42[\"manual\",{}]");
+      }
+    }
+  });
 
   // We don't need this since we're not using HTTP but if it's removed the
   // program
@@ -239,30 +240,13 @@ void RunServer(size_t delay, size_t steps, double steps_dt, double speed) {
   h.run();
 }
 
-template <typename Type>
-Type ParseArg(int argc, char *argv[], std::string argName, std::istringstream &iss, int index, Type defaultValue) {
-  Type out = defaultValue;
-  if (argc > index) {
-    iss.clear();
-    iss.str(argv[index]);
-    if (!(iss >> out)) {
-      std::cout << "Could not read " << argName << ", using default: " << defaultValue << std::endl;
-      out = defaultValue;
-    }
-  }
-  return out;
-}
-
 int main(int argc, char *argv[]) {
-  size_t delay, steps;
-  double steps_dt, speed;
+  MPC::CONFIG config = {100, 15, 0.08, 31.2928, 1.0, 50.0, 0.5, 1000.0, 1.0, 5000.0, 500.0};
 
-  std::istringstream iss;
+  if (argc > 1) {
+    std::string file_name = argv[1];
+    config = MPC::readConfig(file_name);
+  }
 
-  delay = ParseArg(argc, argv, "delay", iss, 1, DEFAULT_DELAY);
-  steps = ParseArg(argc, argv, "steps", iss, 2, DEFAULT_STEPS);
-  steps_dt = ParseArg(argc, argv, "steps delta", iss, 3, DEFAULT_STEPS_DT);
-  speed = ParseArg(argc, argv, "speed", iss, 4, DEFAULT_SPEED);
-
-  RunServer(delay, steps, steps_dt, speed);
+  RunServer(config);
 }

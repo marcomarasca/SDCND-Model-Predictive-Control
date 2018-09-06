@@ -24,25 +24,29 @@ const size_t STATE_SIZE = 6;
 // This is the length from front to CoG that has a similar radius.
 const double LF = 2.67;
 
-// Weights for the components of the cost function
-const double W_CTE = 2000;
-const double W_EPSI = 2000;
-const double W_V = 1;
-const double W_DELTA = 50;
-const double W_A = 50;
-const double W_DELTA_D = 200;
-const double W_A_D = 10;
-
 // Limit bounds
-const double L_MAX = 1.0e5;
+const double L_MAX = 1.0e19;
 const double L_THOTTLE = 1;
-const double L_STEERING = 0.436332;
+const double L_STEERING = 0.436332;  // 25 degrees in radians
 
 // Container for the MPC configuration
 struct CONFIG {
+  size_t delay;
   size_t steps_n;
   double step_dt;
   double target_speed;
+  // Weights for the components of the cost function
+  double w_cte;
+  double w_epsi;
+  double w_v;
+  double w_delta;
+  double w_a;
+  double w_delta_d;
+  double w_a_d;
+};
+
+// Container for variable indexes
+struct VAR_IDX {
   // The solver takes all the state variables and actuator variables in a singular vector. Thus, we should to establish
   // when one variable starts and another ends to make our lifes easier.
   size_t x_start;
@@ -53,6 +57,22 @@ struct CONFIG {
   size_t epsi_start;
   size_t delta_start;
   size_t a_start;
+
+  VAR_IDX(size_t steps_n) {
+    x_start = 0;
+    y_start = x_start + steps_n;
+    psi_start = y_start + steps_n;
+    v_start = psi_start + steps_n;
+    cte_start = v_start + steps_n;
+    epsi_start = cte_start + steps_n;
+    delta_start = epsi_start + steps_n;
+    a_start = delta_start + steps_n - 1;
+  }
+
+  ~VAR_IDX() {}
+
+ private:
+  VAR_IDX() {}
 };
 
 // Container for the MPC solution
@@ -69,10 +89,6 @@ class MPC {
  public:
   // MPC configuration
   CONFIG config;
-  /*
-   * Default constructor, uses 10 steps and 0.1 as delta time
-   */
-  MPC();
 
   /*
    * Contrsuctor
@@ -81,7 +97,7 @@ class MPC {
    * @params step_dt Delta time between each step (in seconds)
    * @params target_speed Target speed
    */
-  MPC(size_t steps_n, double step_dt, double target_speed);
+  MPC(CONFIG& config);
 
   virtual ~MPC();
 
@@ -94,6 +110,10 @@ class MPC {
   MPC_SOLUTION Solve(const Eigen::VectorXd& state, const Eigen::VectorXd& coeffs);
 
  private:
+  MPC();
+  // Variable indexes for ipopt
+  VAR_IDX var_idx;
+  // Ipopt options
   const char* ipopt_options;
 
   // Variables for the solver
