@@ -1,15 +1,15 @@
 {
     "delay": 100,
-    "steps_n": 15,
-    "step_dt": 80,
+    "steps_n": 10,
+    "step_dt": 115,
     "speed": 70,
     "weights": {
-        "cte": 1,
-        "epsi": 50,
+        "cte": 5,
+        "epsi": 100,
         "v": 0.5,
-        "delta": 1000,
-        "a": 1,
+        "delta": 5000,
+        "a": 1.2,
         "delta_d": 5000,
-        "a_d": 500
+        "a_d": 1500
     }
 }

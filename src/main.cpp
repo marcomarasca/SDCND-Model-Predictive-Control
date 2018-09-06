@@ -242,7 +242,7 @@ void RunServer(MPC::CONFIG &config) {
 
 int main(int argc, char *argv[]) {
   // Default configuration
-  MPC::CONFIG config = {100, 15, MPC::Ms2s(80), MPC::Mph2ms(70), 1.0, 50.0, 0.5, 1000.0, 1.0, 5000.0, 500.0};
+  MPC::CONFIG config = {100, 10, MPC::Ms2s(115), MPC::Mph2ms(70), 5.0, 100.0, 0.5, 5000.0, 1.2, 5000.0, 1500.0};
 
   if (argc > 1) {
     std::string file_name = argv[1];
