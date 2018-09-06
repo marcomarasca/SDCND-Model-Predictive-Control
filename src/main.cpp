@@ -1,5 +1,6 @@
 #include <math.h>
 #include <uWS/uWS.h>
+#include <exception>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -17,8 +18,8 @@ using json = nlohmann::json;
 // else the empty string "" will be returned.
 std::string HasData(std::string s) {
   auto found_null = s.find("null");
-  auto b1 = s.find_first_of("[");
-  auto b2 = s.rfind("}]");
+  auto b1         = s.find_first_of("[");
+  auto b2         = s.rfind("}]");
   if (found_null != std::string::npos) {
     return "";
   } else if (b1 != std::string::npos && b2 != std::string::npos) {
@@ -37,12 +38,12 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   const std::vector<double> ptsx = telemetry["ptsx"];
   const std::vector<double> ptsy = telemetry["ptsy"];
 
-  const double px = telemetry["x"];
-  const double py = telemetry["y"];
-  const double psi = telemetry["psi"];
-  const double v = MPC::Mph2ms(telemetry["speed"]);  // Converts the speed from mph to m/s
+  const double px    = telemetry["x"];
+  const double py    = telemetry["y"];
+  const double psi   = telemetry["psi"];
+  const double v     = MPC::Mph2ms(telemetry["speed"]);  // Converts the speed from mph to m/s
   const double delta = telemetry["steering_angle"];
-  const double a = telemetry["throttle"];
+  const double a     = telemetry["throttle"];
 
   // The waypoints are expressed in map coordinates, convert them to the car's coordinate system
   Eigen::VectorXd ptsx_car(ptsx.size());
@@ -142,11 +143,11 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   json msgJson;
 
   msgJson["steering_angle"] = steer_value;
-  msgJson["throttle"] = throttle_value;
-  msgJson["mpc_x"] = mpc_x_vals;
-  msgJson["mpc_y"] = mpc_y_vals;
-  msgJson["next_x"] = next_x_vals;
-  msgJson["next_y"] = next_y_vals;
+  msgJson["throttle"]       = throttle_value;
+  msgJson["mpc_x"]          = mpc_x_vals;
+  msgJson["mpc_y"]          = mpc_y_vals;
+  msgJson["next_x"]         = next_x_vals;
+  msgJson["next_y"]         = next_y_vals;
 
   auto msg = "42[\"steer\"," + msgJson.dump() + "]";
   // Latency
@@ -170,12 +171,7 @@ void RunServer(MPC::CONFIG &config) {
 
   std::string file_name = "results.txt";
   // Creates a file to log values for plotting
-  std::ofstream file_out(file_name);
-
-  if (!file_out.is_open()) {
-    std::cout << "Could not open file" << file_name << " for writing" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  std::ofstream file_out;
 
   uWS::Hub h;
   // Initialize MPC converting units
@@ -190,7 +186,7 @@ void RunServer(MPC::CONFIG &config) {
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
       std::string message = HasData(sdata);
       if (message != "") {
-        auto json_obj = json::parse(message);
+        auto json_obj     = json::parse(message);
         std::string event = json_obj[0].get<std::string>();
         if (event == "telemetry") {
           ProcessTelemetry(ws, mpc, timer, file_out, json_obj[1]);
@@ -215,11 +211,15 @@ void RunServer(MPC::CONFIG &config) {
     }
   });
 
-  h.onConnection(
-      [](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) { std::cout << "Connected!!!" << std::endl; });
+  h.onConnection([&file_out, &file_name](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+    std::cout << "Connected!!!" << std::endl;
+    file_out.open(file_name);
+    if (!file_out.is_open()) {
+      std::cout << "Could not open file " + file_name + " for writing" << std::endl;
+    }
+  });
 
   h.onDisconnection([&file_out](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
-    ws.close();
     std::cout << "Disconnected" << std::endl;
     if (file_out.is_open()) {
       file_out.close();
@@ -241,11 +241,18 @@ void RunServer(MPC::CONFIG &config) {
 }
 
 int main(int argc, char *argv[]) {
-  MPC::CONFIG config = {100, 15, 0.08, 31.2928, 1.0, 50.0, 0.5, 1000.0, 1.0, 5000.0, 500.0};
+  // Default configuration
+  MPC::CONFIG config = {100, 15, MPC::Ms2s(80), MPC::Mph2ms(70), 1.0, 50.0, 0.5, 1000.0, 1.0, 5000.0, 500.0};
 
   if (argc > 1) {
     std::string file_name = argv[1];
-    config = MPC::readConfig(file_name);
+
+    try {
+      config = MPC::readConfig(file_name);
+    } catch (std::exception &e) {
+      std::cout << e.what() << std::endl;
+      exit(EXIT_FAILURE);
+    }
   }
 
   RunServer(config);
