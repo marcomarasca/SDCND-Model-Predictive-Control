@@ -1,9 +1,72 @@
-# CarND-Controls-MPC
-Self-Driving Car Engineer Nanodegree Program
+# Control: MPC Controller
+[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
+[//]: # (Image References)
+
+[sim_gif]: ./images/run_70.gif "Simulator using the MPC controller"
+[sim_video]: ./images/run_70.mp4 "Simulator using the MPC controller"
+[throttle_w_a_low]: ./images/w_a_0.2.png "Throttle graph using a low weight for input a: 0.2"
+[throttle_w_a_high]: ./images/w_a_1.2.png "Throttle graph using a higher weight for input a: 1.2"
+[throttle_w_delta_a_low]: ./images/w_delta_a_0.5.png "Throttle graph using a low weight for the throttle jerkiness: 0.5"
+[throttle_w_delta_a_high]: ./images/w_delta_a_2500.png "Throttle graph using a higher weight for the throttle jerkiness: 2500"
+[cte_w_cte_low]: ./images/w_cte_5.png "CTE graph using a low weight for cte: 5"
+[cte_w_cte_high]: ./images/w_cte_20.png "CTE graph using a higher weight for cte: 20"
+[epsi_w_epsi_20]: ./images/w_epsi_20.png "EPSI graph using a low weight for epsi: 20"
+[epsi_w_epsi_20]: ./images/w_epsi_100.png "EPSI graph using a higher weight for epsi: 100"
+[steering_w_delta_low]: ./images/w_delta_10.png "Steering graph using a low weight for input delta: 10"
+[steering_w_delta_high]: ./images/w_delta_5000.png "Steering graph using a higher weight for input delta: 5000"
+[steering_w_delta_d_low]: ./images/w_delta_d_10.png "Steering graph using a low weight for the steering jerkiness: 10"
+[steering_w_delta_d_high]: ./images/w_delta_d_2500.png "Steering graph using a medium weight for the steering jerkiness: 2500"
+[steering_w_delta_d_high]: ./images/w_delta_d_10000.png "Steering graph using a high weight for the steering jerkiness: 10000"
+
+[cte_dt_80]: ./images/w_dt_80.png "CTE graph using a lower step delta t"
+[cte_dt_115]: ./images/w_dt_115.png "CTE graph using a higher step delta t"
+[cte_n_8]: ./images/w_n_8.png "CTE graph using a lower number of steps"
+[cte_n_10]: ./images/w_n_10.png "CTE graph using a medium number of steps"
+[cte_n_12]: ./images/w_n_12.png "CTE graph using a higher number of steps"
+
+![alt text][sim_gif]
+
+Overview
 ---
 
-## Dependencies
+This repository contains a C++ implementation of a model predictive control (MPC) controller that is used in order to direct a vehicle to follow a desired trajectory.
+
+An MPC is an alternative and more advanced method of process control (e.g. See the [PID Control](https://github.com/Az4z3l/CarND-PID-Controller) project for a simple version of process control) that is used to control a process while satisfying a set of constraints. In particular the problem is reframed in a way to reduce it to an optimization problem. In our case the solution to the optimization problem is the "ideal" trajectory that the vehicle should follow.
+
+The input trajectory may be provided as a set of way-points (or coefficients to describe a line) and the MPC constructs a model of the physics of the vehicle trying to predict how the vehicle will behaves at the various timesteps along the trajectory. The optimization occurs while matching the state of the vehicle according to its model to the ideal trajectory, minimizing a given cost function to provide the closest match between the vehicle "predicted" trajectory to the ideal input trajectory.
+
+In other words the MPC knows the model of the vehicle and given an initial state simulates different "actuator inputs" (e.g. throttle and steering) that produce different trajectories and selecting the one that minimizes the cost.
+
+TODO
+- Describe [Udacity Simulator](https://github.com/udacity/self-driving-car-sim) inputs and outputs
+- Describe the model (state, actuators and updates)
+- Describe the Cost function and constraints
+- Describe the steps prediction and delta t
+- Describe dealing with latency
+- Describe parameter tuning
+
+Getting Started
+---
+
+In order to run the program you need the simulator provided by [Udacity](https://www.udacity.com/) which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases)
+
+This repository includes two files that can be used to set up and install **[uWebSocketIO](https://github.com/uWebSockets/uWebSockets)** for either Linux or Mac systems. For windows you can use either Docker, VMware, or even better [Windows 10 Bash on Ubuntu](https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/) to install uWebSocketIO. The version compatible with the simulator is the uWebSocketIO branch **e94b6e1**.
+
+The application uses **[Ipopt and CppAD](https://projects.coin-or.org/Ipopt)** to find a solution for the cost function, please refer to [this document](https://github.com/Az4z3l/CarND-MPC/blob/master/install_Ipopt_CppAD.md) for installation instructions.
+
+Once uWebSocketIO, Ipopt and CppAD are installed, the main program can be built and run by doing the following from the project top directory.
+
+1. ```mkdir build```
+2. ```cd build```
+3. ```cmake .. && make```
+4. ```./mpc```
+
+Note that to compile the program with debug symbols you can supply the appropriate flag to cmake: ```cmake -DCMAKE_BUILD_TYPE=Debug .. && make```.
+
+Now the Udacity simulator can be run selecting the MPC Control project, press start and see the application in action.
+
+#### Other Dependencies
 
 * cmake >= 3.5
  * All OSes: [click here for installation instructions](https://cmake.org/install/)
@@ -15,94 +78,133 @@ Self-Driving Car Engineer Nanodegree Program
   * Linux: gcc / g++ is installed by default on most Linux distros
   * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
   * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
-  * Run either `install-mac.sh` or `install-ubuntu.sh`.
-  * If you install from source, checkout to commit `e94b6e1`, i.e.
-    ```
-    git clone https://github.com/uWebSockets/uWebSockets
-    cd uWebSockets
-    git checkout e94b6e1
-    ```
-    Some function signatures have changed in v0.14.x. See [this PR](https://github.com/udacity/CarND-MPC-Project/pull/3) for more details.
-
-* **Ipopt and CppAD:** Please refer to [this document](https://github.com/udacity/CarND-MPC-Project/blob/master/install_Ipopt_CppAD.md) for installation instructions.
 * [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page). This is already part of the repo so you shouldn't have to worry about it.
-* Simulator. You can download these from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
-* Not a dependency but read the [DATA.md](./DATA.md) for a description of the data sent back from the simulator.
+
+Environment Setup
+---
+
+This project was developed under windows using the windows subsystem for linux ([WSL](https://docs.microsoft.com/en-us/windows/wsl/install-win10)) with Ubuntu Bash 16.04 together with [Visual Studio Code](https://code.visualstudio.com/).
+
+The steps to setup the environment under mac, linux or windows (WSL) are more or less the same:
+
+- Review the above dependencies
+- Clone the repo and run the appropriate script (./install-ubuntu.sh under WSL and linux and ./install-mac.sh under mac), this should install [uWebSocketIO](https://github.com/uWebSockets/uWebSockets) from the branch **e94b6e1**
+
+Under windows (WSL) and linux you can make a clean installation as follows:
+
+1. ```sudo apt-get update```
+2. ```sudo apt-get install git```
+3. ```sudo apt-get install cmake```
+4. ```sudo apt-get install openssl```
+5. ```sudo apt-get install libssl-dev```
+6. ```git clone https://github.com/Az4z3l/CarND-MPC```
+7. ```sudo rm /usr/lib/libuWS.so```
+8. ```./install-ubuntu.sh```
 
 
-## Basic Build Instructions
+Next install Ipopt:
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./mpc`.
+- For mac:
 
-## Tips
+  1. ```brew tap brewsci/science```
+  2. ```brew install ipopt --with-openblas```
 
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.)
-4.  Tips for setting up your environment are available [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
-5. **VM Latency:** Some students have reported differences in behavior using VM's ostensibly a result of latency.  Please let us know if issues arise as a result of a VM environment.
+- For linux and windows (WSL):
+  1. ```sudo apt-get install gfortran```
+  2. ```sudo apt-get install unzip```
+  3. ```wget https://www.coin-or.org/download/source/Ipopt/Ipopt-3.12.7.zip && unzip Ipopt-3.12.7.zip && rm Ipopt-3.12.7.zip```
+  4. ```sudo ./install_ipopt.sh Ipopt-3.12.7/```
 
-## Editor Settings
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+#### Debugging with VS Code
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+Since I developed this project using WSL and Visual Studio Code it was very useful for me to setup a debugging pipeline. VS Code comes with a official Microsoft cpp extension that can be downloaded directly from the marketplace: https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools. After the installation there are a few things to setup in order to make it work with the subsystem for linux, personally I went with the default Ubuntu distribution.
 
-## Code Style
+For the following setup I assume that the repository was cloned in **D:/Dev/CarND-MPC/**.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+##### Setup the language server (for IntelliSense)
 
-## Project Instructions and Rubric
+From the official documentation [https://github.com/Microsoft/vscode-cpptools/blob/master/Documentation/LanguageServer/Windows%20Subsystem%20for%20Linux.md](https://github.com/Microsoft/vscode-cpptools/blob/master/Documentation/LanguageServer/Windows%20Subsystem%20for%20Linux.md): 
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+Simply Crtl+P and select "C/Cpp: Edit Configurations", this will create a c_cpp_properties.json file that can be configured as follows:
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
+```json
+{
+    "name": "WSL",
+    "intelliSenseMode": "clang-x64",
+    "compilerPath": "/usr/bin/gcc",
+    "includePath": [
+        "${workspaceFolder}"
+    ],
+    "defines": [],
+    "browse": {
+        "path": [
+            "${workspaceFolder}"
+        ],
+        "limitSymbolsToIncludedHeaders": true,
+        "databaseFilename": ""
+    },
+    "cStandard": "c11",
+    "cppStandard": "c++17"
+}
+```
 
-## Hints!
+##### Setup the Debugger
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+From the official documentation [https://github.com/Microsoft/vscode-cpptools/blob/master/Documentation/Debugger/gdb/Windows%20Subsystem%20for%20Linux.md](https://github.com/Microsoft/vscode-cpptools/blob/master/Documentation/Debugger/gdb/Windows%20Subsystem%20for%20Linux.md):
 
-## Call for IDE Profiles Pull Requests
+First install gdb in the WSL:
 
-Help your fellow students!
+```
+sudo apt install gdb
+```
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
+Then simply create a lunch configuration from VS Code: "Debug" -> "Add Configuration.." and setup the launch.json as follows:
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C++ Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/mnt/d/Dev/CarND-MPC/build/mpc",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/mnt/d/Dev/CarND-MPC/build/",
+            "environment": [],
+            "externalConsole": true,
+            "windows": {
+                "MIMode": "gdb",
+                "setupCommands": [
+                    {
+                        "description": "Enable pretty-printing for gdb",
+                        "text": "-enable-pretty-printing",
+                        "ignoreFailures": true
+                    }
+                ]
+            },
+            "pipeTransport": {
+                "pipeCwd": "",
+                "pipeProgram": "c:\\windows\\sysnative\\bash.exe",
+                "pipeArgs": ["-c"],
+                "debuggerPath": "/usr/bin/gdb"
+            },
+            "sourceFileMap": {
+                "/mnt/d": "d:\\"
+            }
+        }
+    ]
+}
+```
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+Note how the program is mapped directly into the file system of the WSL and piped through bash.exe (the paths are relative to the WSL environment).
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
+Now you are ready to debug the application directly from VS Code, simply compile the application from within the WSL with the debug symbols:
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+```cmake -DCMAKE_BUILD_TYPE=Debug .. && make```
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+And run the debugger from VS Code (e.g. F5) :)
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+
