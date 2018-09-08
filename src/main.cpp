@@ -97,7 +97,7 @@ void ProcessTelemetry(uWS::WebSocket<uWS::SERVER> &ws, MPC::MPC &mpc, MPC::Timer
   MPC::Timer::Duration duration = timer.Eval(start);
 
   // Next steering value, normalizing between [-1, 1]
-  const double steer_value = -solution.delta_next / MPC::L_STEERING;
+  const double steer_value = -solution.delta_next / MPC::MAX_STEERING;
 
   // Next throttle value
   const double throttle_value = solution.a_next;
