@@ -171,7 +171,7 @@ The weights on the actuations (steering delta and throttle a) is used to reduce 
 
 The higher the weight the smoother the acceleration of the car. A similar effect, but on the steering can be observed for the weight on the delta actuation:
 
-![alt text][throttle_w_delta_low]![alt text][throttle_w_delta_high]
+![alt text][steering_w_delta_low]![alt text][steering_w_delta_high]
 
 On the left, using a lower weight for delta the vehicle steers much more quickly.
 
