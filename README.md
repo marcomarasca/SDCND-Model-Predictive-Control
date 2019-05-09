@@ -32,7 +32,7 @@ Overview
 
 This repository contains a C++ implementation of a [model predictive control](https://en.wikipedia.org/wiki/Model_predictive_control) (MPC) that is used in order to direct a vehicle to follow a desired trajectory.
 
-An MPC is an alternative and more advanced method of process control (e.g. See the [PID Control](https://github.com/Az4z3l/CarND-PID-Controller) project for a simple version of process control) that is used to control a process while satisfying a set of constraints. In particular the problem is reframed in a way to reduce it to an optimization problem. In our case the solution to the optimization problem is the "ideal" trajectory that the vehicle should follow.
+An MPC is an alternative and more advanced method of process control (e.g. See the [PID Control](https://github.com/marcomarasca/CarND-PID-Controller) project for a simple version of process control) that is used to control a process while satisfying a set of constraints. In particular the problem is reframed in a way to reduce it to an optimization problem. In our case the solution to the optimization problem is the "ideal" trajectory that the vehicle should follow.
 
 The input trajectory may be provided as a set of way-points (or coefficients to describe a line) and the MPC constructs a model of the physics of the vehicle trying to predict how the vehicle will behaves at the various timesteps along the trajectory. The optimization occurs while matching the state of the vehicle according to its model to the ideal trajectory, minimizing a given cost function to provide the closest match between the vehicle "predicted" trajectory to the ideal input trajectory.
 
@@ -236,7 +236,7 @@ In order to run the program you need the simulator provided by [Udacity](https:/
 
 This repository includes two files that can be used to set up and install **[uWebSocketIO](https://github.com/uWebSockets/uWebSockets)** for either Linux or Mac systems. For windows you can use either Docker, VMware, or even better [Windows 10 Bash on Ubuntu](https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/) to install uWebSocketIO. The version compatible with the simulator is the uWebSocketIO branch **e94b6e1**.
 
-The application uses **[Ipopt and CppAD](https://projects.coin-or.org/Ipopt)** to find a solution for the cost function, please refer to [this document](https://github.com/Az4z3l/CarND-MPC/blob/master/install_Ipopt_CppAD.md) for installation instructions.
+The application uses **[Ipopt and CppAD](https://projects.coin-or.org/Ipopt)** to find a solution for the cost function, please refer to [this document](https://github.com/marcomarasca/CarND-MPC/blob/master/install_Ipopt_CppAD.md) for installation instructions.
 
 Once uWebSocketIO, Ipopt and CppAD are installed, the main program can be built and run by doing the following from the project top directory.
 
@@ -280,7 +280,7 @@ Under windows (WSL) and linux you can make a clean installation as follows:
 3. ```sudo apt-get install cmake```
 4. ```sudo apt-get install openssl```
 5. ```sudo apt-get install libssl-dev```
-6. ```git clone https://github.com/Az4z3l/CarND-MPC```
+6. ```git clone https://github.com/marcomarasca/CarND-MPC```
 7. ```sudo rm /usr/lib/libuWS.so```
 8. ```./install-ubuntu.sh```
 
